@@ -15,6 +15,7 @@
   "dependencies": {
     "express": "^4.16.2",
     "request": "^2.87.0",
+    "request-promise": "^4.2.2",
     "sentiment": "^5.0.0",
     "yarn": "^1.7.0"
   },

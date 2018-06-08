@@ -1,5 +1,6 @@
 const express = require('express');
 const request = require('request');
+const requestPromise = require('request-promise');
 const Sentiment = require('sentiment');
 
 const sentiment = new Sentiment();
@@ -13,54 +14,97 @@ app.get('/api/about', (req, res) => {
 
 app.get('/api/:stock/:numArticles', (req, res) => {
 
+  function formatDate(date) {
+    var date = new Date(date);
+    var year = date.getFullYear();
+    var month = date.getMonth();
+    var date = date.getDate();
+    month = month < 10 ? "0" + month : month;
+    date = date < 10 ? "0" + date : date;
+    return year + month.toString() + date;
+  }
 
-  function ajaxPromise(symbol,numArticles) {
+  function pullNewsData(symbol,count) {
 
-    var promiseObj = new Promise(function(resolve, reject) {
+    var promObj = new Promise(function(res, rej) {
 
-      request('https://api.iextrading.com/1.0/stock/'+symbol+'/news/last/'+numArticles,
-        { json: true }, (err, response, body) => {
+      requestPromise('https://api.iextrading.com/1.0/stock/' + symbol + '/news/last/' + count,
+        { json: true }, (apiErr, apiRes, body) => {
 
-        if (err) { reject(err); }
+          if (apiErr) {
+            rej(apiErr);
+          }
 
-        var snapshots = [];
+          var snapshots = [];
 
-        for (var key in body) {
-          if (body.hasOwnProperty(key) &&
+          for (var key in body) {
+            if (body.hasOwnProperty(key) &&
               body[key].summary != '' &&
               body[key].summary != 'No summary available.') {
 
-              var senti = sentiment.analyze(body[key].summary);
+                var articleDate = formatDate(body[key].datetime);
+                var articleSentiment = sentiment.analyze(body[key].summary);
 
-              var snapshot = {
-                'url' : body[key].url,
-                'sentiment_score' : senti.score,
-                'sentiment_strength' : senti.comparative
+                var articleSnapshot = {
+                  'symbol' : symbol,
+                  'date' : formatDate(body[key].datetime),
+                  'url' : body[key].url,
+                  'sentiment_score' : articleSentiment.score,
+                  'sentiment_strength' : articleSentiment.comparative
+                }
+
+                snapshots.push(articleSnapshot);
+
               }
-
-              snapshots.push(snapshot);
           }
-        }
 
-        resolve(snapshots);
-      });
+          (function openCloseLoop(index) {
 
-    });
+            if (index < snapshots.length) {
 
-    return promiseObj;
+              request('https://api.iextrading.com/1.0/stock/' + snapshots[index].symbol + '/chart/date/' + snapshots[index].date,
+                { json: true }, (apiErr, apiRes, body) => {
+
+                  if (apiErr) console.log(apiErr);
+
+                  if (body.length > 0) {
+                    snapshots[index].open = body[0].marketOpen;
+                    snapshots[index].close = body[body.length - 1].marketClose;
+                  } else {
+                    snapshots[index].open = -1;
+                    snapshots[index].close = -1;
+                  }
+
+                  openCloseLoop(index + 1);
+
+                })
+
+            } else {
+              res(snapshots);
+            }
+
+          })(0);
+
+        })
+
+    })
+
+    return promObj;
 
   }
+
+
 
   function returnPromiseData(data) {
     res.send({express:data});
   }
 
   function errorHandler(data) {
-    res.send('error');
+    res.send({express:data});
   }
 
 
-  ajaxPromise(req.params.stock,req.params.numArticles).then(returnPromiseData, errorHandler);
+  pullNewsData(req.params.stock,req.params.numArticles).then(returnPromiseData, errorHandler);
 
 
 })
