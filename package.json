@@ -1,0 +1,24 @@
+{
+  "name": "senti-stock",
+  "version": "1.0.0",
+  "description": "Trend prediciton for stock performance against social sentiment",
+  "author": {
+    "name": "Chris Germano",
+    "email": "chris.eg.germano@gmail.com",
+    "url": "http://cgermano.com"
+  },
+  "scripts": {
+    "client": "cd client && yarn start",
+    "server": "nodemon server.js",
+    "dev": "concurrently --kill-others-on-fail \"yarn server\" \"yarn client\""
+  },
+  "dependencies": {
+    "express": "^4.16.2",
+    "request": "^2.87.0",
+    "sentiment": "^5.0.0",
+    "yarn": "^1.7.0"
+  },
+  "devDependencies": {
+    "concurrently": "^3.5.0"
+  }
+}
